@@ -1,0 +1,74 @@
+name: Build Roblox Revenge
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/build.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out project
+        uses: actions/checkout@v4
+
+      - name: Check out official Revenge Manager source
+        run: git clone --depth 1 https://github.com/revenge-mod/revenge-manager.git upstream
+
+      - name: Configure app identity
+        working-directory: upstream
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          gradle = Path("app/build.gradle.kts")
+          source = gradle.read_text()
+          replacements = {
+              'namespace = "app.revenge.manager"': 'namespace = "com.roblox.revenge.manager"',
+              'applicationId = "app.revenge.manager"': 'applicationId = "com.roblox.revenge.manager"',
+              'buildConfigField("String", "MOD_NAME", "\\"Revenge\\"")': 'buildConfigField("String", "MOD_NAME", "\\"Roblox Revenge\\"")',
+              'buildConfigField("String", "MANAGER_NAME", "\\"RevengeManager\\"")': 'buildConfigField("String", "MANAGER_NAME", "\\"RobloxRevengeManager\\"")',
+              'buildConfigField("String", "MODDED_APP_PACKAGE_NAME", "\\"app.revenge\\"")': 'buildConfigField("String", "MODDED_APP_PACKAGE_NAME", "\\"com.roblox.revenge\\"")',
+          }
+          for old, new in replacements.items():
+              if old not in source:
+                  raise SystemExit(f"Expected upstream setting not found: {old}")
+              source = source.replace(old, new, 1)
+          gradle.write_text(source)
+
+          strings = Path("app/src/main/res/values/strings.xml")
+          source = strings.read_text()
+          old = '<string name="app_name" translatable="false">Revenge Manager</string>'
+          if old not in source:
+              raise SystemExit("Expected Manager app label was not found")
+          strings.write_text(source.replace(old, '<string name="app_name" translatable="false">Roblox Revenge Manager</string>', 1))
+          PY
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build APK
+        working-directory: upstream
+        run: ./gradlew --no-daemon assembleRelease
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Roblox-Revenge-Manager-APK
+          path: upstream/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+          retention-days: 14
