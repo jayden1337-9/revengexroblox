@@ -29,7 +29,6 @@ jobs:
           gradle = Path("app/build.gradle.kts")
           source = gradle.read_text()
           replacements = {
-              'namespace = "app.revenge.manager"': 'namespace = "com.roblox.revenge.manager"',
               'applicationId = "app.revenge.manager"': 'applicationId = "com.roblox.revenge.manager"',
               'buildConfigField("String", "MOD_NAME", "\\"Revenge\\"")': 'buildConfigField("String", "MOD_NAME", "\\"Roblox Revenge\\"")',
               'buildConfigField("String", "MANAGER_NAME", "\\"RevengeManager\\"")': 'buildConfigField("String", "MANAGER_NAME", "\\"RobloxRevengeManager\\"")',
