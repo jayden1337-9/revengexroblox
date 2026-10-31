@@ -86,6 +86,13 @@ jobs:
                       return permission;
                   });
 
+                  property.setAuthorityMapper(authority -> {
+                      if (authority != null && authority.startsWith("com.roblox.client.")) {
+                          return "com.delta.test." + authority.substring("com.roblox.client.".length());
+                      }
+                      return authority;
+                  });
+
                   FileProcesser.processApkFile(args[0], args[1], property);
               }
           }
