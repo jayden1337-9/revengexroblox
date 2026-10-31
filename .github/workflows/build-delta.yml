@@ -53,7 +53,49 @@ jobs:
             --output ManifestEditor.jar
           test -s ManifestEditor.jar
 
-      - name: Change package name and app label
+      - name: Prepare manifest permission rewriter
+        run: |
+          cat > PermissionRewriter.java <<'JAVA'
+          import com.wind.meditor.core.FileProcesser;
+          import com.wind.meditor.property.AttributeItem;
+          import com.wind.meditor.property.ModificationProperty;
+          import com.wind.meditor.utils.NodeValue;
+
+          public class PermissionRewriter {
+              public static void main(String[] args) {
+                  if (args.length != 2) {
+                      throw new IllegalArgumentException("Usage: PermissionRewriter input.apk output.apk");
+                  }
+
+                  ModificationProperty property = new ModificationProperty();
+                  property.addManifestAttribute(
+                      new AttributeItem(NodeValue.Manifest.PACKAGE, "com.delta.test").setNamespace(null)
+                  );
+                  property.addApplicationAttribute(
+                      new AttributeItem(NodeValue.Application.LABEL, "Delta")
+                  );
+
+                  property.setPermissionMapper((type, permission) -> {
+                      if (permission != null && permission.startsWith("com.roblox.client.")) {
+                          return "com.delta.test." + permission.substring("com.roblox.client.".length());
+                      }
+                      return permission;
+                  });
+
+                  FileProcesser.processApkFile(args[0], args[1], property);
+              }
+          }
+          JAVA
+
+          javac -cp ManifestEditor.jar PermissionRewriter.java
+
+      - name: Change package name, app label, and private permission namespace
+        run: |
+          java -cp ManifestEditor.jar:. PermissionRewriter original.apk modified-unsigned.apk
+
+          test -s modified-unsigned.apk
+          unzip -t modified-unsigned.apk
+
         run: |
           java -jar ManifestEditor.jar original.apk \
             -pkg com.delta.test \
