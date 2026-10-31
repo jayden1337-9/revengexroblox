@@ -47,9 +47,11 @@ jobs:
             https://github.com/iBotPeaches/Apktool/releases/download/v2.11.1/apktool_2.11.1.jar \
             --output apktool.jar
 
-      - name: Decode and change only Android package identity and app label
+      - name: Decode manifest while preserving compiled resources
         run: |
-          java -jar apktool.jar d --force original.apk --output decoded
+          # The APK contains a resource-table package Apktool cannot decode.
+          # Skip resource decoding so the compiled resource table stays intact.
+          java -jar apktool.jar d --no-res --force original.apk --output decoded
           python3 - <<'PY'
           import xml.etree.ElementTree as ET
           from pathlib import Path
