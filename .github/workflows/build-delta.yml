@@ -100,15 +100,6 @@ jobs:
           test -s modified-unsigned.apk
           unzip -t modified-unsigned.apk
 
-        run: |
-          java -jar ManifestEditor.jar original.apk \
-            -pkg com.delta.test \
-            -aa android-label:Delta \
-            -o modified-unsigned.apk
-
-          test -s modified-unsigned.apk
-          unzip -t modified-unsigned.apk
-
       - name: Verify manifest before signing
         run: |
           BUILD_TOOLS="$ANDROID_HOME/build-tools/35.0.0"
