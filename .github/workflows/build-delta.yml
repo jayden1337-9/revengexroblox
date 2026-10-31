@@ -48,7 +48,7 @@ jobs:
       - name: Set up Android SDK tools
         uses: android-actions/setup-android@v3
         with:
-          packages: build-tools;35.0.0
+          packages: build-tools;35.0.0 platforms;android-35
 
       - name: Download binary manifest editor
         run: |
@@ -108,6 +108,52 @@ jobs:
           java -cp ManifestEditor.jar:. PermissionRewriter original.apk modified-unsigned.apk
 
           test -s modified-unsigned.apk
+          unzip -t modified-unsigned.apk
+
+      - name: Add matching Android Main dispatcher
+        env:
+          COROUTINES_VERSION: "1.10.2"
+        run: |
+          set -euo pipefail
+          BUILD_TOOLS="$ANDROID_HOME/build-tools/35.0.0"
+          ANDROID_JAR="$ANDROID_HOME/platforms/android-35/android.jar"
+
+          # The APK contains kotlinx-coroutines-core but not the Android Main dispatcher.
+          # Kotlin 2.2.21 metadata in this APK aligns with the 1.10.2 coroutines line.
+          curl --fail --location --retry 3 \
+            "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-android/$COROUTINES_VERSION/kotlinx-coroutines-android-$COROUTINES_VERSION.aar" \
+            --output coroutines-android.aar
+          unzip -p coroutines-android.aar classes.jar > coroutines-android.jar
+          test -s coroutines-android.jar
+
+          SERVICE="META-INF/services/kotlinx.coroutines.internal.MainDispatcherFactory"
+          unzip -p coroutines-android.jar "$SERVICE" > main-dispatcher-service.txt
+          grep -F "kotlinx.coroutines.android.AndroidDispatcherFactory" main-dispatcher-service.txt
+
+          mkdir -p dispatcher-dex
+          "$BUILD_TOOLS/d8" --min-api 23 --lib "$ANDROID_JAR" \
+            --output dispatcher-dex coroutines-android.jar
+          test -s dispatcher-dex/classes.dex
+
+          if unzip -Z1 modified-unsigned.apk | grep -qx 'classes5.dex'; then
+            echo "classes5.dex already exists; refusing to overwrite an existing DEX file."
+            exit 1
+          fi
+
+          cp dispatcher-dex/classes.dex dispatcher-dex/classes5.dex
+          mkdir -p dispatcher-dex/META-INF/services
+          cp main-dispatcher-service.txt \\
+            dispatcher-dex/META-INF/services/kotlinx.coroutines.internal.MainDispatcherFactory
+          (
+            cd dispatcher-dex
+            zip -q ../modified-unsigned.apk classes5.dex \\
+              META-INF/services/kotlinx.coroutines.internal.MainDispatcherFactory
+          )
+
+          unzip -p modified-unsigned.apk classes5.dex | strings | \\
+            grep -F 'kotlinx/coroutines/android/AndroidDispatcherFactory'
+          unzip -p modified-unsigned.apk "$SERVICE" | \\
+            grep -F 'kotlinx.coroutines.android.AndroidDispatcherFactory'
           unzip -t modified-unsigned.apk
 
       - name: Verify manifest before signing
