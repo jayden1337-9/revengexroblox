@@ -33,6 +33,7 @@ jobs:
           curl --fail --location --retry 3 "$APK_URL" --output original.apk
           test -s original.apk
           file original.apk
+          unzip -t original.apk
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -45,58 +46,29 @@ jobs:
         with:
           packages: build-tools;35.0.0
 
-      - name: Install Apktool
+      - name: Download binary manifest editor
         run: |
           curl --fail --location --retry 3 \
-            https://github.com/iBotPeaches/Apktool/releases/download/v2.11.1/apktool_2.11.1.jar \
-            --output apktool.jar
+            https://github.com/WindySha/ManifestEditor/releases/download/v2.0/ManifestEditor-2.0.jar \
+            --output ManifestEditor.jar
+          test -s ManifestEditor.jar
 
-      - name: Decode manifest while preserving compiled resources
+      - name: Change package name and app label
         run: |
-          java -jar apktool.jar d \
-            --no-res \
-            --force-manifest \
-            --force \
-            original.apk \
-            --output decoded
+          java -jar ManifestEditor.jar original.apk \
+            -pkg com.delta.test \
+            -aa android-label:Delta \
+            -o modified-unsigned.apk
 
-          python3 - <<'PY'
-          import xml.etree.ElementTree as ET
-          from pathlib import Path
+          test -s modified-unsigned.apk
+          unzip -t modified-unsigned.apk
 
-          manifest_path = Path("decoded/AndroidManifest.xml")
-
-          tree = ET.parse(manifest_path)
-          root = tree.getroot()
-
-          old_package = root.get("package")
-          if not old_package:
-              raise SystemExit("Manifest package attribute was not found")
-
-          root.set("package", "com.delta.test")
-
-          android = "{http://schemas.android.com/apk/res/android}"
-          application = root.find("application")
-
-          if application is None:
-              raise SystemExit("Manifest application element was not found")
-
-          application.set(android + "label", "Delta")
-
-          tree.write(
-              manifest_path,
-              encoding="utf-8",
-              xml_declaration=True
-          )
-
-          print(f"Changed package: {old_package} -> com.delta.test")
-          print("Changed application label to Delta")
-          PY
-
-      - name: Rebuild APK
+      - name: Verify manifest before signing
         run: |
-          java -Xmx5g -jar apktool.jar b decoded --output unsigned.apk
-          test -s unsigned.apk
+          BUILD_TOOLS="$ANDROID_HOME/build-tools/35.0.0"
+          "$BUILD_TOOLS/aapt" dump badging modified-unsigned.apk | tee manifest-check.txt
+          grep -F "package: name='com.delta.test'" manifest-check.txt
+          grep -F "application-label:'Delta'" manifest-check.txt
 
       - name: Align and sign APK
         run: |
@@ -112,7 +84,7 @@ jobs:
             -validity 10000 \
             -dname "CN=Local Repackaged App, OU=Android, O=Local, L=Unknown, ST=Unknown, C=US"
 
-          "$BUILD_TOOLS/zipalign" -p -f 4 unsigned.apk aligned.apk
+          "$BUILD_TOOLS/zipalign" -p -f 4 modified-unsigned.apk aligned.apk
 
           "$BUILD_TOOLS/apksigner" sign \
             --ks delta-signing.jks \
@@ -122,6 +94,7 @@ jobs:
             aligned.apk
 
           "$BUILD_TOOLS/apksigner" verify --verbose Delta.apk
+          "$BUILD_TOOLS/aapt" dump badging Delta.apk | grep -F "package: name='com.delta.test'"
           test -s Delta.apk
 
       - name: Upload Delta APK
