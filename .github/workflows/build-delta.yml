@@ -121,10 +121,10 @@ jobs:
           # The APK contains kotlinx-coroutines-core but not the Android Main dispatcher.
           # Kotlin 2.2.21 metadata in this APK aligns with the 1.10.2 coroutines line.
           curl --fail --location --retry 3 \
-            "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-android/$COROUTINES_VERSION/kotlinx-coroutines-android-$COROUTINES_VERSION.aar" \
-            --output coroutines-android.aar
-          unzip -p coroutines-android.aar classes.jar > coroutines-android.jar
+            "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-android/$COROUTINES_VERSION/kotlinx-coroutines-android-$COROUTINES_VERSION.jar" \
+            --output coroutines-android.jar
           test -s coroutines-android.jar
+          jar tf coroutines-android.jar | grep -F 'kotlinx/coroutines/android/AndroidDispatcherFactory.class'
 
           SERVICE="META-INF/services/kotlinx.coroutines.internal.MainDispatcherFactory"
           unzip -p coroutines-android.jar "$SERVICE" > main-dispatcher-service.txt
