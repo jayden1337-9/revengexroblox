@@ -1,0 +1,101 @@
+name: Repackage Roblox as Delta
+
+on:
+  workflow_dispatch:
+    inputs:
+      apk_url:
+        description: "Direct GitHub Release asset URL for the original APK"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  repackage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate and download input APK
+        env:
+          APK_URL: ${{ inputs.apk_url }}
+        run: |
+          case "$APK_URL" in
+            https://github.com/jayden1337-9/revengexroblox/releases/download/*) ;;
+            *) echo "Use a direct asset URL from this repository's GitHub Releases."; exit 1 ;;
+          esac
+          curl --fail --location --retry 3 "$APK_URL" --output original.apk
+          test -s original.apk
+          file original.apk
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK tools
+        uses: android-actions/setup-android@v3
+        with:
+          packages: build-tools;35.0.0
+
+      - name: Install Apktool
+        run: |
+          curl --fail --location --retry 3 \
+            https://github.com/iBotPeaches/Apktool/releases/download/v2.11.1/apktool_2.11.1.jar \
+            --output apktool.jar
+
+      - name: Decode and change only Android package identity and app label
+        run: |
+          java -jar apktool.jar d --force original.apk --output decoded
+          python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+
+          manifest_path = Path("decoded/AndroidManifest.xml")
+          tree = ET.parse(manifest_path)
+          root = tree.getroot()
+          old_package = root.get("package")
+          if not old_package:
+              raise SystemExit("Manifest package attribute was not found")
+          root.set("package", "com.delta.test")
+
+          android = "{http://schemas.android.com/apk/res/android}"
+          application = root.find("application")
+          if application is None:
+              raise SystemExit("Manifest application element was not found")
+          application.set(android + "label", "Delta")
+
+          tree.write(manifest_path, encoding="utf-8", xml_declaration=True)
+          print(f"Changed manifest package {old_package} -> com.delta.test")
+          print("Changed launcher application label -> Delta")
+          PY
+
+      - name: Rebuild APK
+        run: java -Xmx5g -jar apktool.jar b decoded --output unsigned.apk
+
+      - name: Align and sign APK
+        run: |
+          BUILD_TOOLS="$ANDROID_HOME/build-tools/35.0.0"
+          keytool -genkeypair -v \
+            -keystore delta-signing.jks \
+            -storepass android -keypass android \
+            -alias delta -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=Local Repackaged App, OU=Android, O=Local, L=Unknown, ST=Unknown, C=US"
+          "$BUILD_TOOLS/zipalign" -p -f 4 unsigned.apk aligned.apk
+          "$BUILD_TOOLS/apksigner" sign \
+            --ks delta-signing.jks \
+            --ks-pass pass:android \
+            --key-pass pass:android \
+            --out Delta.apk aligned.apk
+          "$BUILD_TOOLS/apksigner" verify --verbose Delta.apk
+
+      - name: Upload Delta APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Delta-APK
+          path: Delta.apk
+          if-no-files-found: error
+          retention-days: 7
