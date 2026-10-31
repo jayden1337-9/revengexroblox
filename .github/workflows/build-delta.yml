@@ -1,11 +1,15 @@
 name: Repackage Roblox as Delta
 
 on:
+  push:
+    paths:
+      - ".github/workflows/build-delta.yml"
   workflow_dispatch:
     inputs:
       apk_url:
         description: "Direct GitHub Release asset URL for the original APK"
-        required: true
+        required: false
+        default: "https://github.com/jayden1337-9/revengexroblox/releases/download/apk-input/Delta-2.743.1136-02.apk"
         type: string
 
 permissions:
@@ -20,7 +24,7 @@ jobs:
 
       - name: Validate and download input APK
         env:
-          APK_URL: ${{ inputs.apk_url }}
+          APK_URL: ${{ inputs.apk_url || 'https://github.com/jayden1337-9/revengexroblox/releases/download/apk-input/Delta-2.743.1136-02.apk' }}
         run: |
           case "$APK_URL" in
             https://github.com/jayden1337-9/revengexroblox/releases/download/*) ;;
