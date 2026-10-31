@@ -87,6 +87,9 @@ jobs:
                   });
 
                   property.setAuthorityMapper(authority -> {
+                      if ("com.roblox.client".equals(authority)) {
+                          return "com.delta.test";
+                      }
                       if (authority != null && authority.startsWith("com.roblox.client.")) {
                           return "com.delta.test." + authority.substring("com.roblox.client.".length());
                       }
