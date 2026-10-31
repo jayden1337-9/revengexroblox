@@ -142,17 +142,17 @@ jobs:
 
           cp dispatcher-dex/classes.dex dispatcher-dex/classes5.dex
           mkdir -p dispatcher-dex/META-INF/services
-          cp main-dispatcher-service.txt \\
+          cp main-dispatcher-service.txt \
             dispatcher-dex/META-INF/services/kotlinx.coroutines.internal.MainDispatcherFactory
           (
             cd dispatcher-dex
-            zip -q ../modified-unsigned.apk classes5.dex \\
+            zip -q ../modified-unsigned.apk classes5.dex \
               META-INF/services/kotlinx.coroutines.internal.MainDispatcherFactory
           )
 
-          unzip -p modified-unsigned.apk classes5.dex | strings | \\
+          unzip -p modified-unsigned.apk classes5.dex | strings | \
             grep -F 'kotlinx/coroutines/android/AndroidDispatcherFactory'
-          unzip -p modified-unsigned.apk "$SERVICE" | \\
+          unzip -p modified-unsigned.apk "$SERVICE" | \
             grep -F 'kotlinx.coroutines.android.AndroidDispatcherFactory'
           unzip -t modified-unsigned.apk
 
