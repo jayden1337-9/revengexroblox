@@ -1,4 +1,4 @@
-name: Build IconForge APK
+name: Build IconForge (Folio base)
 
 on:
   push:
@@ -12,22 +12,45 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout IconForge project
         uses: actions/checkout@v4
+
+      - name: Get Folio launcher source (MIT)
+        run: |
+          git clone https://github.com/McCal-Codes/folio.git folio-source
+          cd folio-source
+          git checkout eea5f4aa1bd009e583f6ba06e62281f13b8b30d2
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.9'
-      - name: Build debug APK
-        run: gradle --no-daemon assembleDebug
+
+      - name: Brand the test build as IconForge Preview
+        working-directory: folio-source
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("app/build.gradle.kts")
+          s = p.read_text()
+          old = 'manifestPlaceholders["appLabel"] = "Folio Dev"'
+          new = 'manifestPlaceholders["appLabel"] = "IconForge Preview"'
+          if old not in s:
+              raise SystemExit("Could not find Folio Dev app label to customize")
+          p.write_text(s.replace(old, new, 1))
+          PY
+
+      - name: Build optimized launcher APK
+        working-directory: folio-source
+        run: ./gradlew --no-daemon :app:assembleFast
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: IconForge-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          name: IconForge-preview-apk
+          path: folio-source/app/build/outputs/apk/fast/app-fast.apk
           if-no-files-found: error
