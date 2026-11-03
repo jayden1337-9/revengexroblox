@@ -139,7 +139,7 @@ public class MainActivity extends Activity {
         search.setHintTextColor(secondary);search.setHint("⌕   Search apps");search.setPadding(dp(16),0,dp(16),0);
         search.setBackground(shape(glass,18));content.addView(search,new LinearLayout.LayoutParams(-1,dp(52)));
         ScrollView sc=new ScrollView(this);LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(-1,0,1);sp.topMargin=dp(14);content.addView(sc,sp);
-        ListViewlessList list=new ListViewlessList();adapter=new AppAdapter();list.setAdapter(adapter);sc.addView(list);
+        ListViewlessList list=new ListViewlessList();adapter=new AppAdapter();list.setAdapter(adapter);adapter.listRef=list;list.refresh();sc.addView(list);
         search.addTextChangedListener(new TextWatcher(){public void beforeTextChanged(CharSequence s,int st,int c,int a){}public void onTextChanged(CharSequence s,int st,int before,int count){adapter.filter(s.toString());}public void afterTextChanged(Editable e){}});
         TextView home=label("‹   Home Screen",15,accent,true);home.setGravity(Gravity.CENTER);home.setPadding(0,dp(15),0,dp(8));home.setOnClickListener(v->showHome());content.addView(home);
     }
